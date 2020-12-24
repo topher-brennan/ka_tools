@@ -4,13 +4,10 @@ class Dynasty
 end
 
 class Royal
-  attr_accessor :carried_genetic_diseases, :children, :current_ruler, :father, :predecessor, :quarters_to_next_marriage, :successor
+  attr_accessor :children, :current_ruler, :father, :predecessor, :quarters_to_next_marriage, :successor
 
   def initialize(options={})
-    @genetic_diseases = options[:genetic_diseases] || []
-    @carried_genetic_diseases = options[:carried_genetic_diseases] || [SecureRandom.uuid]
     @health = one_d + 8
-    @health -= 4 if @genetic_diseases.any?
     @father = options[:father]
     @mother = options[:mother]
     @age_quarters = options[:age_quarters] || 0
@@ -115,15 +112,7 @@ class Royal
   end
 
   def bear_child
-    maternal_curse = generate_curse
-    paternal_curse = @husband.generate_curse
-
-    full_curse = maternal_curse & paternal_curse
-    half_curse = (maternal_curse | paternal_curse) - full_curse
-
     child = Royal.new({
-      genetic_diseases: full_curse,
-      carried_genetic_diseases: half_curse,
       mother: self,
       father: @husband,
       gender: [:male, :female].sample
@@ -133,10 +122,6 @@ class Royal
     @husband.children << child
   end
 
-  def generate_curse
-    Set.new(@genetic_diseases + @carried_genetic_diseases.filter { one_d <= 3 })
-  end
-  
   def die
     @health = 0
   end
