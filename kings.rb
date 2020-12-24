@@ -22,11 +22,19 @@ class Royal
     @former_ruler = options[:former_ruler] || false
     @quarters_to_next_marriage = 68 + n_d(12)
     @quarters_to_next_birth = nil
-    @quarters_since_last_birth = nil
     @children_soft_cap = one_d
     @done_having_children = false
     @predecessor = nil
     @successor = nil
+  end
+
+  def print_family_tree(depth=0)
+    line = ' ' * depth + '-' + object_id.to_s
+    # line += '(M)' if male?
+    # line += '(F)' if female?
+    puts line
+    sons.each { |son| son.print_family_tree(depth+1) }
+    true
   end
 
   def age_years
@@ -51,7 +59,7 @@ class Royal
         make_aging_roll
       end
 
-      if male? && male_heirs.empty?
+      if male? && male_heirs.none?
         @quarters_to_next_marriage -= 1
         if @quarters_to_next_marriage < 1 && @wives.none?(&:pregnant?)
           @wives << Royal.new({age_quarters: 56 + n_d(4), gender: :female, husband: self})
@@ -65,17 +73,11 @@ class Royal
             @quarters_to_birth -= 1
             if @quarters_to_birth < 1
               @quarters_to_birth = nil
-              @quarters_since_last_birth = 0
               bear_child
             end
           end
         elsif husband_alive? && age_years < 50 && !@done_having_children
-          roll = three_d
-          if roll < 8 - recent_birth_modifier
-            @quarters_to_birth = 3
-          end
-        elsif @quarters_since_last_birth
-          @quarters_since_last_birth += 1
+          3.times { @quarters_to_birth = 3 if three_d <= 6 }
         end
 
         if @children.size >= @children_soft_cap && @husband.male_heirs.any?
@@ -161,10 +163,6 @@ class Royal
   
   def husband_alive?
     @husband && @husband.alive?
-  end
-
-  def recent_birth_modifier
-    @quarters_since_last_birth ? [5 - @quarters_since_last_birth, 0].max : 0
   end
 
   def sons
