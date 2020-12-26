@@ -4,7 +4,7 @@ class Dynasty
 end
 
 class Royal
-  attr_accessor :children, :current_ruler, :father, :predecessor, :quarters_to_next_marriage, :successor
+  attr_accessor :age_quarters, :children, :current_ruler, :father, :predecessor, :quarters_to_next_marriage, :successor, :wives
 
   def initialize(options={})
     @health = one_d + 8
@@ -23,14 +23,21 @@ class Royal
     @done_having_children = false
     @predecessor = nil
     @successor = nil
+    @reign_quarters = 0
   end
 
   def print_family_tree(depth=0)
-    line = ' ' * depth + '-' + object_id.to_s
-    # line += '(M)' if male?
-    # line += '(F)' if female?
+    line = ' ' * depth + "-#{object_id}: "
+    line += ' M' if male?
+    line += ' F' if female?
+    line += " Age: #{age_years}"
+    if @reign_quarters > 0
+      line += " Reign Length: #{@reign_quarters / 4}" 
+    else
+      line += " Generations to Claim: #{generations_to_claim}"
+    end
     puts line
-    sons.each { |son| son.print_family_tree(depth+1) }
+    @children.each { |child| child.print_family_tree(depth+1) }
     true
   end
 
@@ -48,6 +55,7 @@ class Royal
 
     if alive?
       @age_quarters += 1
+      @reign_quarters += 1 if @current_ruler
       if age_years >= 90
         make_aging_roll
       elsif age_years >= 70 && @age_quarters % 2 == 0
@@ -56,7 +64,7 @@ class Royal
         make_aging_roll
       end
 
-      if male? && male_heirs.none?
+      if male? && male_heirs.none? && generations_to_claim < 5
         @quarters_to_next_marriage -= 1
         if @quarters_to_next_marriage < 1 && @wives.none?(&:pregnant?)
           @wives << Royal.new({age_quarters: 56 + n_d(4), gender: :female, husband: self})
@@ -74,7 +82,7 @@ class Royal
             end
           end
         elsif husband_alive? && age_years < 50 && !@done_having_children
-          3.times { @quarters_to_birth = 3 if three_d <= 6 }
+          3.times { @quarters_to_birth = 3 if three_d <= 6 - recent_birth_modifier }
         end
 
         if @children.size >= @children_soft_cap && @husband.male_heirs.any?
@@ -91,24 +99,22 @@ class Royal
     elsif roll > modified_health - 2
       @health -= 1
     end
-
-    if @health < 1
-      if female? && husband_alive?
-        @husband.quarters_to_next_marriage = one_d
-      end
-
-      if male? && @current_ruler
-        @current_ruler = false
-        @former_ruler = true
-        male_heirs.first && male_heirs.first.current_ruler = true
-      end
-    end
   end
 
   def modified_health
     result = @health
     result += 5 if @current_ruler
     result
+  end
+
+  def generations_to_claim
+    return 0 if @current_ruler || @reign_quarters > 0
+    return Float::INFINITY if !@father
+    @father.generations_to_claim + 1
+  end
+
+  def recent_birth_modifier
+    (@children.map { |child| 3 - child.age_quarters / 2 } + [0]).max 
   end
 
   def bear_child
@@ -120,6 +126,18 @@ class Royal
 
     @children << child
     @husband.children << child
+  end
+
+  def end_reign(heir=nil)
+    heir ||= male_heirs.first
+    raise Exception.new("Cannot automatically designate heir") if heir.nil?
+    
+    @current_ruler = false
+    heir.current_ruler = true
+
+    @successor = heir
+    heir.predecessor = self
+    true
   end
 
   def die
@@ -162,6 +180,12 @@ class Royal
     end
     result
   end
+
+  def heirs_through_multiple_wives?
+    @wives.filter do |wife|
+      wife.male_heirs.any?
+    end.size > 1
+  end
 end
 
 def one_d
@@ -169,7 +193,7 @@ def one_d
 end
 
 def n_d(n)
-  Array.new(n) { one_d }.inject(0, :+)
+  Array.new(n) { one_d }.inject(:+)
 end
 
 def three_d
@@ -184,10 +208,6 @@ end
 # If a king's heir is very young when the king dies, chance of relative taking the throne (possibly king's brother *or* any female relative with male-line descent).
 #   * IMPORTANT: This event may require some human adjudication
 
-# A male royal's first choice is to marry a woman with an independent claim to the throne between the ages of 15 and 20. If none is available, a new female character can be created with a starting age of 4d/4+14.
-# * People never marry their direct descendants / ancestors or siblings but everyone else is fair game.
-
-# Kings get +5 to health for all purposes except they are still dead if health reaches 0 for any reason.
-
 # TODO: Game should have a "founder" singleton field.
-# TODO: Family tree pruning (don't simulate characters who are more than 4 generations from an actual king, e.g. a thrice-great grandchild).
+
+# TODO: Figure out how to calculate degree of inbred-ness.
