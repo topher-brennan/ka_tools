@@ -73,6 +73,7 @@ class Royal
         if (bride && age_years >= 20 && @wives.none?) ||
             (@quarters_to_next_marriage < 1 && @wives.none?(&:pregnant?))
           bride ||= Royal.new({age_quarters: 56 + n_d(4), gender: :female})
+          
           bride.husband = self
           @wives << bride 
           @quarters_to_next_marriage = 16
@@ -222,15 +223,19 @@ class Royal
     end.size > 1
   end
 
-  def find_bride
+  def potential_brides
     dynasty_founder.female_heirs.filter do |fr| # fr = female relative
       fr.husband.nil? && 
           fr.age_quarters >= 60 &&
           fr.age_quarters <= 80 &&
-          fr.generations_to_claim < 5
+          fr.generations_to_claim < 5 &&
           !sisters.include?(fr) && 
           !daughters.include?(fr)
-    end.sample
+    end
+  end
+
+  def find_bride
+    potential_brides.sample
   end
 
   def married_to_princess?
