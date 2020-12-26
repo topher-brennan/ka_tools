@@ -4,7 +4,7 @@ class Dynasty
 end
 
 class Royal
-  attr_accessor :age_quarters, :children, :current_ruler, :father, :predecessor, :quarters_to_next_marriage, :successor, :wives
+  attr_accessor :age_quarters, :children, :current_ruler, :father, :husband, :predecessor, :quarters_to_next_marriage, :successor, :wives
 
   def initialize(options={})
     @health = one_d + 8
@@ -24,17 +24,19 @@ class Royal
     @predecessor = nil
     @successor = nil
     @reign_quarters = 0
+    @ancestor_chains = nil
   end
 
   def print_family_tree(depth=0)
-    line = ' ' * depth + "-#{object_id}: "
-    line += ' M' if male?
-    line += ' F' if female?
-    line += " Age: #{age_years}"
+    line = ' ' * depth + "#{alive? ? 'o' : 'x'}#{object_id}:\t"
+    line += 'M' if male?
+    line += 'F' if female?
+    line += '*' if married_to_princess?
+    line += "\tAge: #{age_years}"
     if @reign_quarters > 0
-      line += " Reign Length: #{@reign_quarters / 4}" 
+      line += "\tReign Length: #{@reign_quarters / 4}" 
     else
-      line += " Generations to Claim: #{generations_to_claim}"
+      line += "\tGenerations to Claim: #{generations_to_claim}"
     end
     puts line
     @children.each { |child| child.print_family_tree(depth+1) }
@@ -66,8 +68,13 @@ class Royal
 
       if male? && male_heirs.none? && generations_to_claim < 5
         @quarters_to_next_marriage -= 1
-        if @quarters_to_next_marriage < 1 && @wives.none?(&:pregnant?)
-          @wives << Royal.new({age_quarters: 56 + n_d(4), gender: :female, husband: self})
+        bride = (generations_to_claim < 3 ? find_bride : nil)
+
+        if (bride && age_years >= 20 && @wives.none?) ||
+            (@quarters_to_next_marriage < 1 && @wives.none?(&:pregnant?))
+          bride ||= Royal.new({age_quarters: 56 + n_d(4), gender: :female})
+          bride.husband = self
+          @wives << bride 
           @quarters_to_next_marriage = 16
         end
       end
@@ -149,7 +156,7 @@ class Royal
   end
 
   def dead?
-    !alive!
+    !alive?
   end
 
   def male?
@@ -172,6 +179,18 @@ class Royal
     @children.filter(&:male?)
   end
 
+  def daughters
+    @children.filter(&:female?)
+  end
+
+  def sisters
+    (@father && @father.daughters) || []
+  end
+
+  def dynasty_founder
+    @father ? @father.dynasty_founder : self
+  end
+
   def male_heirs
     result = []
     sons.each do |son|
@@ -181,10 +200,76 @@ class Royal
     result
   end
 
-  def heirs_through_multiple_wives?
+  def female_heirs
+    result = daughters.filter(&:alive?)
+    sons.each do |son|
+      result += son.female_heirs
+    end
+    result
+  end
+
+  def male_heirs_through_multiple_wives?
     @wives.filter do |wife|
       wife.male_heirs.any?
     end.size > 1
+  end
+
+  def find_bride
+    dynasty_founder.female_heirs.filter do |fr| # fr = female relative
+      fr.husband.nil? && 
+          fr.age_quarters >= 60 &&
+          fr.age_quarters <= 80 &&
+          fr.generations_to_claim < 5
+          !sisters.include?(fr) && 
+          !daughters.include?(fr)
+    end.sample
+  end
+
+  def married_to_princess?
+    @wives.any? { |wife| wife.generations_to_claim < 5 }
+  end
+
+  def inbreeding_coefficient
+  end
+
+  def ancestor_chains(force_recalculate = false)
+    return @ancestor_chains if @ancestor_chains && !force_recalculate
+
+    chains = []
+
+    if @father
+      chains << [@father]
+      @father.ancestor_chains(force_recalculate).each do |chain|
+        chains << (chain + [@father])
+      end
+    end
+
+    if @mother
+      chains << [@mother]
+      @mother.ancestor_chains(force_recalculate).each do |chain|
+        chains << (chain + [@mother])
+      end
+    end
+
+    @ancestor_chains = chains
+    @ancestor_chains
+  end
+
+  def inbreeding_coefficient
+    result = 0
+    l = ancestor_chains.size
+
+    (0...l).each do |i|
+      (i+1...l).each do |j|
+        first_chain = ancestor_chains[i]
+        second_chain = ancestor_chains[j]
+        if first_chain.first == second_chain.first && first_chain[1...].none? { |el| second_chain.include?(el) }
+          result += 0.5 ** (first_chain.size + second_chain.size - 1)
+        end
+      end
+    end
+
+    result
   end
 end
 
@@ -200,6 +285,18 @@ def three_d
   n_d(3)
 end
 
+def run_simulation(ruler, random_pause_chance=0.01)
+  raise Exception.new("Invalid ruler.") unless ruler.current_ruler
+  founder = ruler.dynasty_founder
+  while ruler.alive? && rand > random_pause_chance && !ruler.male_heirs_through_multiple_wives? &&
+      !(ruler.male_heirs.first && ruler.male_heirs.first.male_heirs_through_multiple_wives?)
+    founder.simulate_quarter
+  end
+
+  end_reign if ruler.dead?
+  ruler.alive?
+end
+
 # Ways royals can die young (should all be very rare):
 # * Position in the Southlands overrun (kills with no health check or chance of resurrection, ideally should happen once to ruler and once to crucial non-ruler)
 # * Palace intrigue: if king has sons by multiple wives, random wife and all her sons execeuted for treason (ideally should happen exactly once in 700 years)
@@ -207,7 +304,5 @@ end
 
 # If a king's heir is very young when the king dies, chance of relative taking the throne (possibly king's brother *or* any female relative with male-line descent).
 #   * IMPORTANT: This event may require some human adjudication
-
-# TODO: Game should have a "founder" singleton field.
 
 # TODO: Figure out how to calculate degree of inbred-ness.
