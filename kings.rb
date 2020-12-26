@@ -4,12 +4,12 @@ class Dynasty
 end
 
 class Royal
-  attr_accessor :age_quarters, :children, :current_ruler, :father, :husband, :predecessor, :quarters_to_next_marriage, :successor, :wives
+  attr_accessor :age_quarters, :children, :current_ruler, :father, :husband, :mother, :predecessor, :quarters_to_next_marriage, :successor, :wives
 
   def initialize(options={})
-    @health = one_d + 8
     @father = options[:father]
     @mother = options[:mother]
+    @health = one_d + 8 - (inbreeding_coefficient * 4).floor
     @age_quarters = options[:age_quarters] || 0
     @children = options[:children] || []
     @wives = options[:wives] || []
@@ -110,8 +110,16 @@ class Royal
 
   def modified_health
     result = @health
-    result += 5 if @current_ruler
+    if @current_ruler
+      result += 5
+    elsif crown_prince?
+      result += 4
+    end
     result
+  end
+
+  def crown_prince?
+    @father && @father.current_ruler && @father.sons.first == self
   end
 
   def generations_to_claim
@@ -229,9 +237,6 @@ class Royal
     @wives.any? { |wife| wife.generations_to_claim < 5 }
   end
 
-  def inbreeding_coefficient
-  end
-
   def ancestor_chains(force_recalculate = false)
     return @ancestor_chains if @ancestor_chains && !force_recalculate
 
@@ -293,7 +298,7 @@ def run_simulation(ruler, random_pause_chance=0.01)
     founder.simulate_quarter
   end
 
-  end_reign if ruler.dead?
+  ruler.end_reign if ruler.dead?
   ruler.alive?
 end
 
