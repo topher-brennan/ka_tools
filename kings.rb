@@ -4,7 +4,7 @@ class Dynasty
 end
 
 class Royal
-  attr_accessor :age_quarters, :children, :current_ruler, :father, :husband, :mother, :predecessor, :quarters_to_next_marriage, :successor, :wives
+  attr_accessor :age_quarters, :children, :father, :health, :husband, :is_current_ruler, :mother, :predecessor, :quarters_to_next_marriage, :reign_quarters, :successor, :wives
 
   def initialize(options={})
     @father = options[:father]
@@ -15,7 +15,7 @@ class Royal
     @wives = options[:wives] || []
     @husband = options[:husband]
     @gender = options[:gender] || :male
-    @current_ruler = options[:current_ruler] || false
+    @is_current_ruler = options[:is_current_ruler] || false
     @former_ruler = options[:former_ruler] || false
     @quarters_to_next_marriage = 68 + n_d(12)
     @quarters_to_next_birth = nil
@@ -57,7 +57,7 @@ class Royal
 
     if alive?
       @age_quarters += 1
-      @reign_quarters += 1 if @current_ruler
+      @reign_quarters += 1 if @is_current_ruler
       if age_years >= 90
         make_aging_roll
       elsif age_years >= 70 && @age_quarters % 2 == 0
@@ -66,9 +66,9 @@ class Royal
         make_aging_roll
       end
 
-      if male? && male_heirs.none? && generations_to_claim < 5
+      if male? && male_heirs.none? && (generations_to_claim < 7 || crown_prince?)
         @quarters_to_next_marriage -= 1
-        bride = (generations_to_claim < 3 ? find_bride : nil)
+        bride = ((generations_to_claim < 3 || crown_prince?) ? find_bride : nil)
 
         if (bride && age_years >= 20 && @wives.none?) ||
             (@quarters_to_next_marriage < 1 && @wives.none?(&:pregnant?))
@@ -111,20 +111,28 @@ class Royal
 
   def modified_health
     result = @health
-    if @current_ruler
+    if @is_current_ruler
       result += 5
     elsif crown_prince?
-      result += 4
+      # result += 4
     end
     result
   end
 
+  def current_successor
+    @successor ? @successor.current_successor : self
+  end
+
+  def current_ruler
+    dynasty_founder.current_successor
+  end
+
   def crown_prince?
-    @father && @father.current_ruler && @father.sons.first == self
+    self == (current_ruler && current_ruler.male_heirs.first)
   end
 
   def generations_to_claim
-    return 0 if @current_ruler || @reign_quarters > 0
+    return 0 if @is_current_ruler || @reign_quarters > 0
     return Float::INFINITY if !@father
     @father.generations_to_claim + 1
   end
@@ -148,8 +156,8 @@ class Royal
     heir ||= male_heirs.first
     raise Exception.new("Cannot automatically designate heir") if heir.nil?
     
-    @current_ruler = false
-    heir.current_ruler = true
+    @is_current_ruler = false
+    heir.is_current_ruler = true
 
     @successor = heir
     heir.predecessor = self
@@ -296,7 +304,7 @@ def three_d
 end
 
 def run_simulation(ruler, random_pause_chance=0.01)
-  raise Exception.new("Invalid ruler.") unless ruler.current_ruler
+  raise Exception.new("Invalid ruler.") unless ruler.is_current_ruler
   founder = ruler.dynasty_founder
   while ruler.alive? && rand > random_pause_chance && !ruler.male_heirs_through_multiple_wives? &&
       !(ruler.male_heirs.first && ruler.male_heirs.first.male_heirs_through_multiple_wives?)
