@@ -9,7 +9,7 @@ class Royal
   def initialize(options={})
     @father = options[:father]
     @mother = options[:mother]
-    @health = one_d + 8 - (inbreeding_coefficient * 4).floor
+    @health = one_d + 8 # - (inbreeding_coefficient * 4).floor
     @age_quarters = options[:age_quarters] || 0
     @children = options[:children] || []
     @wives = options[:wives] || []
@@ -66,7 +66,7 @@ class Royal
         make_aging_roll
       end
 
-      if male? && male_heirs.none? && (generations_to_claim < 7 || crown_prince?)
+      if male? && first_male_heir.nil? && (generations_to_claim < 7 || crown_prince?)
         @quarters_to_next_marriage -= 1
         bride = ((generations_to_claim < 3 || crown_prince?) ? find_bride : nil)
 
@@ -128,7 +128,7 @@ class Royal
   end
 
   def crown_prince?
-    self == (current_ruler && current_ruler.male_heirs.first)
+    self == (current_ruler && current_ruler.first_male_heir)
   end
 
   def generations_to_claim
@@ -153,7 +153,7 @@ class Royal
   end
 
   def end_reign(heir=nil)
-    heir ||= male_heirs.first
+    heir ||= first_male_heir
     raise Exception.new("Cannot automatically designate heir") if heir.nil?
     
     @is_current_ruler = false
@@ -206,6 +206,15 @@ class Royal
 
   def dynasty_founder
     @father ? @father.dynasty_founder : self
+  end
+
+  def first_male_heir
+    sons.each do |son|
+      return son if son.alive?
+      son_heir = son.first_male_heir
+      return son_heir if son_heir
+    end
+    nil
   end
 
   def male_heirs
@@ -273,6 +282,7 @@ class Royal
     @ancestor_chains
   end
 
+  # TODO: Not actually sure this is right, see http://www.genetic-genealogy.co.uk/Toc115570144.html
   def inbreeding_coefficient
     result = 0
     l = ancestor_chains.size
@@ -282,7 +292,7 @@ class Royal
         first_chain = ancestor_chains[i]
         second_chain = ancestor_chains[j]
         if first_chain.first == second_chain.first && first_chain[1...].none? { |el| second_chain.include?(el) }
-          result += 0.5 ** (first_chain.size + second_chain.size - 1)
+          result += 0.5 ** (first_chain.size + second_chain.size - 1) * (1 + first_chain[0].inbreeding_coefficient)
         end
       end
     end
@@ -307,7 +317,7 @@ def run_simulation(ruler, random_pause_chance=0.01)
   raise Exception.new("Invalid ruler.") unless ruler.is_current_ruler
   founder = ruler.dynasty_founder
   while ruler.alive? && rand > random_pause_chance && !ruler.male_heirs_through_multiple_wives? &&
-      !(ruler.male_heirs.first && ruler.male_heirs.first.male_heirs_through_multiple_wives?)
+      !(ruler.first_male_heir && ruler.first_male_heir.male_heirs_through_multiple_wives?)
     founder.simulate_quarter
   end
 
