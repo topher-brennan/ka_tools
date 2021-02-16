@@ -4,7 +4,7 @@ class Dynasty
 end
 
 class Royal
-  attr_accessor :age_quarters, :children, :father, :health, :husband, :is_current_ruler, :mother, :predecessor, :quarters_to_next_marriage, :reign_quarters, :successor, :wives
+  attr_accessor :age_quarters, :children, :father, :health, :husband, :is_current_ruler, :mother, :predecessor, :quarters_to_next_marriage, :reign_quarters, :successor, :top_heirs, :wives
 
   def initialize(options={})
     @father = options[:father]
@@ -25,6 +25,7 @@ class Royal
     @successor = nil
     @reign_quarters = 0
     @ancestor_chains = nil
+    @inbreeding_coefficient = nil
   end
 
   def print_family_tree(depth=0)
@@ -49,6 +50,10 @@ class Royal
 
   def simulate_quarter
     if male?
+      if @father.nil?
+        @top_heirs = Set.new(male_heirs[0...100])
+      end
+
       @children.each { |child| child.simulate_quarter }
       @wives.each do |wife|
         wife.simulate_quarter if wife.father.nil?
@@ -66,7 +71,7 @@ class Royal
         make_aging_roll
       end
 
-      if male? && first_male_heir.nil? && (generations_to_claim < 7 || crown_prince?)
+      if male? && first_male_heir.nil? && (@is_current_ruler || dynasty_founder.top_heirs.include?(self))
         @quarters_to_next_marriage -= 1
         bride = ((generations_to_claim < 3 || crown_prince?) ? find_bride : nil)
 
@@ -261,7 +266,6 @@ class Royal
 
   def ancestor_chains(force_recalculate = false)
     return @ancestor_chains if @ancestor_chains && !force_recalculate
-
     chains = []
 
     if @father
@@ -278,26 +282,39 @@ class Royal
       end
     end
 
+    chains.sort! { |chain1, chain2| chain2.first <=> chain1.first }
     @ancestor_chains = chains
     @ancestor_chains
   end
 
-  # TODO: Not actually sure this is right, see http://www.genetic-genealogy.co.uk/Toc115570144.html
   def inbreeding_coefficient
+    return @inbreeding_coefficient if @inbreeding_coefficient
     result = 0
     l = ancestor_chains.size
 
-    (0...l).each do |i|
-      (i+1...l).each do |j|
+    i = 0
+    while i < l
+      j = i + 1
+      while j < l
         first_chain = ancestor_chains[i]
         second_chain = ancestor_chains[j]
         if first_chain.first == second_chain.first && first_chain[1...].none? { |el| second_chain.include?(el) }
           result += 0.5 ** (first_chain.size + second_chain.size - 1) * (1 + first_chain[0].inbreeding_coefficient)
+          j += 1
+        else
+          i = j
+          j = l
         end
       end
+      i += 1
     end
 
+    @inbreeding_coefficient = result
     result
+  end
+
+  def <=> other
+    self.hash <=> other.hash
   end
 end
 
@@ -316,7 +333,7 @@ end
 def run_simulation(ruler, random_pause_chance=0.01)
   raise Exception.new("Invalid ruler.") unless ruler.is_current_ruler
   founder = ruler.dynasty_founder
-  while ruler.alive? && rand > random_pause_chance && !ruler.male_heirs_through_multiple_wives? &&
+  while ruler.alive? && rand > random_pause_chance # && !ruler.male_heirs_through_multiple_wives? &&
       !(ruler.first_male_heir && ruler.first_male_heir.male_heirs_through_multiple_wives?)
     founder.simulate_quarter
   end
@@ -332,5 +349,3 @@ end
 
 # If a king's heir is very young when the king dies, chance of relative taking the throne (possibly king's brother *or* any female relative with male-line descent).
 #   * IMPORTANT: This event may require some human adjudication
-
-# TODO: Figure out how to calculate degree of inbred-ness.
