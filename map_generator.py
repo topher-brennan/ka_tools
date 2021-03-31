@@ -6,7 +6,18 @@ from math import pi, sqrt, tan
 MAP_SIZE = 257
 TAN_10_DEG = tan(pi / 18)
 TAN_30_DEG = tan(pi / 6)
+TAN_MINUS_12_DEG = tan(-1 * pi / 15)
 ROUGHNESS = 1
+DIRECTIONS = [
+    [-1, -1],
+    [-1, 0],
+    [-1, 1],
+    [0, -1],
+    [0, 1],
+    [1, -1],
+    [1, 0],
+    [1, 1],
+]
 
 def bishop_step(map, y, x, step):
     map[y][x] = (map[y-step][x-step] + map[y+step][x-step] + map[y-step][x+step] + map[y+step][x+step]) / 4 + ROUGHNESS * TAN_10_DEG * step * (random() * 2 - 1)
@@ -49,21 +60,49 @@ def x_incline(map, y, x):
 def slope_code(map, y, x):
     if map[y][x] <=0:
         return 0
-    total_slope = sqrt(y_incline(map, y, x)**2 + x_incline(map, y, x)**2)
-    if total_slope < TAN_10_DEG:
+    # total_slope = sqrt(y_incline(map, y, x)**2 + x_incline(map, y, x)**2)
+    # if total_slope < TAN_10_DEG:
+    #     return 1
+    # elif total_slope < TAN_30_DEG:
+    #     return 2
+    # else:
+    #     return 3
+    nf = naismith_factor(map, y, x)
+    if nf < 1.5:
         return 1
-    elif total_slope < TAN_30_DEG:
+    elif nf < 3.5:
         return 2
     else:
         return 3
 
+def naismith_factor(map, y, x):
+    factors = []
+    for dir in DIRECTIONS:
+        if y + dir[0] > 0 and y + dir[0] < MAP_SIZE and x + dir[1] > 0 and x + dir[1] < MAP_SIZE:
+            rise = map[y][x] - map[y+dir[0]][x+dir[1]]
+            run = sqrt(dir[0]**2 + dir[1]**2)
+            rise_over_run = rise / run
+            if rise_over_run >= 0:
+                factors.append(1 + rise_over_run * 5280 / 2000 * 3)
+            elif rise_over_run >= TAN_MINUS_12_DEG:
+                factors.append(1 - rise_over_run * 5280 / 2000)
+            else:
+                factors.append(1 + rise_over_run * 5280 / 2000)
+    if len(factors) == 1:
+       return factors[0]
+    else:
+        return sorted(factors)[-2]
+
 done = False
 while not done:
     map = [[None for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
-    for y in [0, -1]:
-        map[y][-1] = 0
-        map[y][0] = 0
     step = int((MAP_SIZE - 1)/2)
+
+    map[0][0] = 0
+    map[0][-1] = 0
+    map[-1][0] = ROUGHNESS * TAN_10_DEG * step * random() * 2
+    # map[-1][-1] = ROUGHNESS * TAN_10_DEG * step * random() * -2
+    map[-1][-1] = 0
     
     while step > 0:
         for y in range(step, MAP_SIZE, step * 2):
@@ -80,8 +119,8 @@ while not done:
     if right_max < 0:
         right_max = 0
     left_min = min(row[0] for row in map)
-    if left_min > -0.02:
-        left_min = -0.02
+    if left_min > -0.015:
+        left_min = -0.015
     for y in range(MAP_SIZE):
         for x in range(MAP_SIZE):
             map[y][x] -= right_max * x / MAP_SIZE
@@ -108,12 +147,12 @@ while not done:
         for x in range(MAP_SIZE):
             if arable_map[y][x] != 0:
                 total_land += 1
-                if arable_map[y][x] == 1:
+                if arable_map[y][x] == '=':
                     total_arable += 1
     
-    if all([el != 0 for el in map[0][:100]]):
+    if all([el != 0 for el in arable_map[0][0:100]]):
         done = True
 
 print(f'Total arable: {total_arable}')
-print(f'Pop: {total_arable*275}')
+print(f'Pop: {total_arable*200}')
 print(f'% arable: {total_arable / total_land}')
