@@ -138,8 +138,6 @@ while not done:
            if inland_distance <= (100 + (MAP_SIZE - 100) / MAP_SIZE * y) and arable_map[y][x] == 1:
     	        arable_map[y][x] = '='
 
-    for row in arable_map:
-        print(''.join([str(el) for el in row]))
     
     total_arable = 0
     total_land = 0
@@ -153,6 +151,8 @@ while not done:
     if all([el != 0 for el in arable_map[0][0:100]]):
         done = True
 
+for row in arable_map:
+    print(''.join([str(el) for el in row]))
 print(f'Total arable: {total_arable}')
 print(f'Pop: {total_arable*200}')
 print(f'% arable: {total_arable / total_land}')
