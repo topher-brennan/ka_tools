@@ -282,6 +282,8 @@ class Royal
       end
     end
 
+    # TODO: Eliminate, or prevent introduction of, redundancies.
+
     chains.sort! { |chain1, chain2| chain2.first <=> chain1.first }
     @ancestor_chains = chains
     @ancestor_chains
