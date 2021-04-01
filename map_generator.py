@@ -1,13 +1,14 @@
 from random import random
-from math import pi, sqrt, tan
+from math import e, log, pi, sqrt, tan
 
 # Starting with a system for generating the Southlands
 
-MAP_SIZE = 257
+MAP_SIZE = 2**8 + 1
 TAN_10_DEG = tan(pi / 18)
 TAN_30_DEG = tan(pi / 6)
 TAN_MINUS_12_DEG = tan(-1 * pi / 15)
 ROUGHNESS = 1
+BASE_HEIGHT = e ** (1/3)
 DIRECTIONS = [
     [-1, -1],
     [-1, 0],
@@ -20,11 +21,11 @@ DIRECTIONS = [
 ]
 
 def bishop_step(map, y, x, step):
-    map[y][x] = (map[y-step][x-step] + map[y+step][x-step] + map[y-step][x+step] + map[y+step][x+step]) / 4 + ROUGHNESS * TAN_10_DEG * step * (random() * 2 - 1)
+    map[y][x] = (map[y-step][x-step] + map[y+step][x-step] + map[y-step][x+step] + map[y+step][x+step]) / 4 + ROUGHNESS * TAN_10_DEG * BASE_HEIGHT ** log(step) * (random() * 2 - 1)
 
 def rook_step(map, y, x, step):
     if map[y][x] is None:
-        map[y][x] = average_adjacent(map, y, x, step) + ROUGHNESS * TAN_10_DEG * step * (random() * 2 - 1)
+        map[y][x] = average_adjacent(map, y, x, step) + ROUGHNESS * TAN_10_DEG * BASE_HEIGHT ** log(step) * (random() * 2 - 1)
 
 def average_adjacent(map, y, x, step):
     adjacent_heights = []
@@ -88,19 +89,16 @@ def naismith_factor(map, y, x):
                 factors.append(1 - rise_over_run * 5280 / 2000)
             else:
                 factors.append(1 + rise_over_run * 5280 / 2000)
-    if len(factors) == 1:
-       return factors[0]
-    else:
-        return sorted(factors)[-2]
+    return max(factors)
 
 done = False
 while not done:
     map = [[None for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
     step = int((MAP_SIZE - 1)/2)
 
-    map[0][0] = 0
+    map[0][0] = 0.01 + 0.01 * random()
     map[0][-1] = 0
-    map[-1][0] = ROUGHNESS * TAN_10_DEG * step * random() * 2
+    map[-1][0] = ROUGHNESS * TAN_10_DEG * BASE_HEIGHT ** log(step) * random() * 2
     # map[-1][-1] = ROUGHNESS * TAN_10_DEG * step * random() * -2
     map[-1][-1] = 0
     
@@ -119,12 +117,12 @@ while not done:
     if right_max < 0:
         right_max = 0
     left_min = min(row[0] for row in map)
-    if left_min > -0.015:
-        left_min = -0.015
+    if left_min > 0:
+        left_min = 0
     for y in range(MAP_SIZE):
         for x in range(MAP_SIZE):
             map[y][x] -= right_max * x / MAP_SIZE
-            map[y][x] -= left_min * (MAP_SIZE - x) / MAP_SIZE
+            map[y][x] -= left_min * y * (MAP_SIZE - x) / MAP_SIZE ** 2
     	
     # arable_map = [[(2 if map[y][x] <= 0 else (1 if arable(map, y, x) else 0)) for x in range(MAP_SIZE)] for y in range(MAP_SIZE)]
     arable_map = [[slope_code(map, y, x) for x in range(MAP_SIZE)] for y in range(MAP_SIZE)]
@@ -135,7 +133,7 @@ while not done:
                inland_distance -= 1
            else:
                 inland_distance += 1
-           if inland_distance <= (100 + (MAP_SIZE - 100) / MAP_SIZE * y) and arable_map[y][x] == 1:
+           if inland_distance <= 100 + max([0, (MAP_SIZE - 200) * TAN_30_DEG]) and arable_map[y][x] == 1:
     	        arable_map[y][x] = '='
 
     
@@ -151,8 +149,14 @@ while not done:
     if all([el != 0 for el in arable_map[0][0:100]]):
         done = True
 
+f = open('southlands.csv', 'w')
+f.write('\n'.join([','.join([str(point) for point in row]) for row in map])) 
+
 for row in arable_map:
     print(''.join([str(el) for el in row]))
+high_point = max([max([el for el in row]) for row in map])
+print(f'Northwest elevation: {map[0][0]}')
+print(f'High point: {high_point}')
 print(f'Total arable: {total_arable}')
 print(f'Pop: {total_arable*200}')
 print(f'% arable: {total_arable / total_land}')
