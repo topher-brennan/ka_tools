@@ -91,39 +91,7 @@ def naismith_factor(map, y, x):
                 factors.append(1 + rise_over_run * 5280 / 2000)
     return max(factors)
 
-done = False
-while not done:
-    map = [[None for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
-    step = int((MAP_SIZE - 1)/2)
-
-    map[0][0] = 0.01 + 0.01 * random()
-    map[0][-1] = 0
-    map[-1][0] = ROUGHNESS * TAN_10_DEG * BASE_HEIGHT ** log(step) * random() * 2
-    # map[-1][-1] = ROUGHNESS * TAN_10_DEG * step * random() * -2
-    map[-1][-1] = 0
-    
-    while step > 0:
-        for y in range(step, MAP_SIZE, step * 2):
-            for x in range(step, MAP_SIZE, step * 2):
-    	        bishop_step(map, y, x, step)
-        
-        for y in range(0, MAP_SIZE, step):
-            for x in range(0, MAP_SIZE, step):
-                rook_step(map, y, x, step)
-    
-        step = int(step/2)
-    
-    right_max = max(row[-1] for row in map)
-    if right_max < 0:
-        right_max = 0
-    left_min = min(row[0] for row in map)
-    if left_min > 0:
-        left_min = 0
-    for y in range(MAP_SIZE):
-        for x in range(MAP_SIZE):
-            map[y][x] -= right_max * x / MAP_SIZE
-            map[y][x] -= left_min * y * (MAP_SIZE - x) / MAP_SIZE ** 2
-    	
+def code_map(map):
     # arable_map = [[(2 if map[y][x] <= 0 else (1 if arable(map, y, x) else 0)) for x in range(MAP_SIZE)] for y in range(MAP_SIZE)]
     arable_map = [[slope_code(map, y, x) for x in range(MAP_SIZE)] for y in range(MAP_SIZE)]
     for y in range(MAP_SIZE):
@@ -133,30 +101,71 @@ while not done:
                inland_distance -= 1
            else:
                 inland_distance += 1
-           if inland_distance <= 100 + max([0, (MAP_SIZE - 200) * TAN_30_DEG]) and arable_map[y][x] == 1:
+           if inland_distance <= (100 + y / 4) and arable_map[y][x] == 1:
     	        arable_map[y][x] = '='
+    return arable_map
 
+def print_arable_map(arable_map):
+    for row in arable_map:
+        print(''.join([str(el) for el in row]))
+    high_point = max([max([el for el in row]) for row in map])
+    print(f'Northwest elevation: {map[0][0]}')
+    print(f'High point: {high_point}')
+    print(f'Total arable: {total_arable}')
+    print(f'Pop: {total_arable*200}')
+    print(f'% arable: {total_arable / total_land}')
+
+def open_csv(filename):
+    return [[float(point) for point in row.split(',')] for row in open(filename).read().split('\n')]
+
+if __name__ == "__main__":
+    done = False
+    while not done:
+        map = [[None for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
+        step = int((MAP_SIZE - 1)/2)
     
-    total_arable = 0
-    total_land = 0
-    for y in range(MAP_SIZE):
-        for x in range(MAP_SIZE):
-            if arable_map[y][x] != 0:
-                total_land += 1
-                if arable_map[y][x] == '=':
-                    total_arable += 1
+        map[0][0] = 0.01 + 0.01 * random()
+        map[0][-1] = 0
+        map[-1][0] = ROUGHNESS * TAN_10_DEG * BASE_HEIGHT ** log(step) * random() * 2
+        # map[-1][-1] = ROUGHNESS * TAN_10_DEG * step * random() * -2
+        map[-1][-1] = 0
+        
+        while step > 0:
+            for y in range(step, MAP_SIZE, step * 2):
+                for x in range(step, MAP_SIZE, step * 2):
+        	        bishop_step(map, y, x, step)
+            
+            for y in range(0, MAP_SIZE, step):
+                for x in range(0, MAP_SIZE, step):
+                    rook_step(map, y, x, step)
+        
+            step = int(step/2)
+        
+        right_max = max(row[-1] for row in map)
+        if right_max < 0:
+            right_max = 0
+        left_min = min(row[0] for row in map)
+        if left_min > 0:
+            left_min = 0
+        for y in range(MAP_SIZE):
+            for x in range(MAP_SIZE):
+                map[y][x] -= right_max * x / MAP_SIZE
+                map[y][x] -= left_min * y * (MAP_SIZE - x) / MAP_SIZE ** 2
+        	
+        arable_map = code_map(map)
+        
+        total_arable = 0
+        total_land = 0
+        for y in range(MAP_SIZE):
+            for x in range(MAP_SIZE):
+                if arable_map[y][x] != 0:
+                    total_land += 1
+                    if arable_map[y][x] == '=':
+                        total_arable += 1
+        
+        if all([el != 0 for el in arable_map[0][0:100]]):
+            done = True
+    f = open('southlands.csv', 'w')
+    f.write('\n'.join([','.join([str(point) for point in row]) for row in map])) 
     
-    if all([el != 0 for el in arable_map[0][0:100]]):
-        done = True
-
-f = open('southlands.csv', 'w')
-f.write('\n'.join([','.join([str(point) for point in row]) for row in map])) 
-
-for row in arable_map:
-    print(''.join([str(el) for el in row]))
-high_point = max([max([el for el in row]) for row in map])
-print(f'Northwest elevation: {map[0][0]}')
-print(f'High point: {high_point}')
-print(f'Total arable: {total_arable}')
-print(f'Pop: {total_arable*200}')
-print(f'% arable: {total_arable / total_land}')
+    print_arable_map(arable_map)
