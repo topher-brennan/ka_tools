@@ -1,5 +1,6 @@
 from random import random
-from math import e, log, pi, sqrt, tan
+from math import atan, degrees, e, log, pi, sqrt, tan
+from numpy import cross
 
 # Starting with a system for generating the Southlands
 
@@ -17,6 +18,12 @@ DIRECTIONS = [
     [0, 1],
     [1, -1],
     [1, 0],
+    [1, 1],
+]
+DIAGONALS = [
+    [-1, -1],
+    [-1, 1],
+    [1, -1],
     [1, 1],
 ]
 
@@ -105,7 +112,25 @@ def code_map(map):
     	        arable_map[y][x] = '='
     return arable_map
 
-def print_arable_map(arable_map):
+# Is there a better name for this?
+def vector_slope(vector):
+    horizontal = sqrt(vector[0]**2 + vector[1]**2)
+    if horizontal == 0:
+        return 90
+    radians = atan(vector[2] / horizontal)
+    return degrees(radians)
+
+def quadrant_is_arable(map, y, x, dir):
+    if y + dir[0] < 0 or y + dir[0] >= MAP_SIZE or x + dir[1] < 0 or x + dir[1] >= MAP_SIZE:
+        return False
+    leg1 = [dir[0], 0, map[y+dir[0]][x] - map[y][x]]
+    leg2 = [0, dir[1], map[y][x+dir[1]] - map[y][x]]
+    return vector_slope(cross(leg1, leg2)) > 80
+
+def arable_quadrants(map, y, x):
+    len([dir for dir in DIAGONALS if quadrant_is_arable(map, y, x, dir)])
+
+def print_arable_map(map, arable_map):
     for row in arable_map:
         print(''.join([str(el) for el in row]))
     high_point = max([max([el for el in row]) for row in map])
@@ -168,4 +193,4 @@ if __name__ == "__main__":
     f = open('southlands.csv', 'w')
     f.write('\n'.join([','.join([str(point) for point in row]) for row in map])) 
     
-    print_arable_map(arable_map)
+    print_arable_map(map, arable_map)
