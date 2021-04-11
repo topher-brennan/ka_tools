@@ -112,6 +112,28 @@ def code_map(map):
     	        arable_map[y][x] = '='
     return arable_map
 
+def code_map2(map):
+    arable_map = [[slope_code(map, y, x) for x in range(MAP_SIZE)] for y in range(MAP_SIZE)]
+    for y in range(MAP_SIZE):
+        inland_distance = 0
+        for x in reversed(range(MAP_SIZE)):
+           if arable_map[y][x] == 0:
+               arable_map[y][x] = 'w'
+               if inland_distance > 0:
+                   inland_distance -= 1
+           else:
+                inland_distance += 1
+                aq = arable_quadrants(map, y, x)
+                if inland_distance <= (100 + y / 4) and aq > 0:
+    	            arable_map[y][x] = aq
+                elif arable_map[y][x] == 1:
+                    arable_map[y][x] = 'P'
+                elif arable_map[y][x] == 2:
+                    arable_map[y][x] = 'H'
+                else:
+                    arable_map[y][x] = 'M'
+    return arable_map
+
 # Is there a better name for this?
 def vector_slope(vector):
     horizontal = sqrt(vector[0]**2 + vector[1]**2)
@@ -128,17 +150,17 @@ def quadrant_is_arable(map, y, x, dir):
     return vector_slope(cross(leg1, leg2)) > 80
 
 def arable_quadrants(map, y, x):
-    len([dir for dir in DIAGONALS if quadrant_is_arable(map, y, x, dir)])
+    return len([dir for dir in DIAGONALS if quadrant_is_arable(map, y, x, dir)])
 
-def print_arable_map(map, arable_map):
+def print_arable_map(map, arable_map, total_arable, total_land):
     for row in arable_map:
         print(''.join([str(el) for el in row]))
     high_point = max([max([el for el in row]) for row in map])
     print(f'Northwest elevation: {map[0][0]}')
     print(f'High point: {high_point}')
     print(f'Total arable: {total_arable}')
-    print(f'Pop: {total_arable*200}')
-    print(f'% arable: {total_arable / total_land}')
+    print(f'Pop: {total_arable*50}')
+    print(f'% arable: {total_arable / total_land / 4}')
 
 def open_csv(filename):
     return [[float(point) for point in row.split(',')] for row in open(filename).read().split('\n')]
@@ -177,20 +199,22 @@ if __name__ == "__main__":
                 map[y][x] -= right_max * x / MAP_SIZE
                 map[y][x] -= left_min * y * (MAP_SIZE - x) / MAP_SIZE ** 2
         	
-        arable_map = code_map(map)
+        arable_map = code_map2(map)
         
         total_arable = 0
         total_land = 0
         for y in range(MAP_SIZE):
             for x in range(MAP_SIZE):
-                if arable_map[y][x] != 0:
+                if arable_map[y][x] != 'w':
                     total_land += 1
-                    if arable_map[y][x] == '=':
-                        total_arable += 1
+                    if type(arable_map[y][x]) == int:
+                        total_arable += arable_map[y][x]
         
-        if all([el != 0 for el in arable_map[0][0:100]]):
+        # if all([el != 'w' for el in arable_map[0][0:100]]):
+        if True:
             done = True
-    f = open('southlands.csv', 'w')
-    f.write('\n'.join([','.join([str(point) for point in row]) for row in map])) 
+
+    # f = open('southlands.csv', 'w')
+    # f.write('\n'.join([','.join([str(point) for point in row]) for row in map])) 
     
-    print_arable_map(map, arable_map)
+    print_arable_map(map, arable_map, total_arable, total_land)
