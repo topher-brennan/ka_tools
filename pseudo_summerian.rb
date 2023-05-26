@@ -10,7 +10,7 @@ NASAL_CONSONANTS = ['m', 'n']
     syllable = [VOWELS.sample, CONSONANTS.sample].join
     if consonant_first
         syllable.reverse!
-        syllable << NASAL_CONSONANTS.sample if rand(20) == 0
+        syllable << NASAL_CONSONANTS.sample if rand(40) == 0
     end
     name << syllable
     consonant_first = true if syllable.size == 1
