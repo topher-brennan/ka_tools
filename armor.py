@@ -40,6 +40,7 @@ BY_LOCATION = {
     # 'NECK':     (0.05, 4.0 / 216),
     'CHEST':      (0.75, 52.0 / 216),
     'ABDOMEN':    (0.25, 27.0 / 216),
+    # 'TORSO':      (1.00, 79.0 / 216),
     'SHOULDERS':  (0.10, 46.0 / 216 / 6),
     'UPPER_ARMS': (0.10, 46.0 / 216 / 6),
     'ELBOWS':     (0.05, 46.0 / 216 / 6),
@@ -109,24 +110,29 @@ def item_value(material, location):
         result *= 1.4
     elif location in ['CHEST', 'ABDOMEN']:
         result *= 6.5 / 6
-    return round(result * 10) / 10.0
+    return round(result)
 
 def item_cost(material, location):
+    if material == 'NO' and location == 'FEET':
+        return 25.0 # Sandals
+
     result = BY_MATERIAL[material][1] * BY_LOCATION[location][0]
     if location == 'HEAD':
-        result += 10 * 1.15
+        result += 10    
     return round(result)
 
 def item_weight(material, location):
+    if material == 'NO' and location == 'FEET':
+        return 0.5 # Sandals
+
     result = BY_MATERIAL[material][2] * BY_LOCATION[location][0]
     if location == 'HEAD':
-        result += 1.2 * 1.15
-    return round(result)
+        result += 1.2
+    return round(result * 10) / 10.0
 
 print(LOCATIONS)
-print(for_cost_and_weight(837, 68.8))
+# print(for_cost_and_weight(837, 68.8))
 print(for_cost_and_weight(640, 72.8))
-print(for_cost_and_weight(680, 88.8))
-print(for_cost_and_weight(417, 68.8))
-for i in range(21):
-    print(for_cost_and_weight(1000 + 500 * i, 83.8))
+# print(for_cost_and_weight(6000, 83.8))
+# print(for_cost_and_weight(9000, 83.8))
+# print(for_cost_and_weight(10000, 83.8))
