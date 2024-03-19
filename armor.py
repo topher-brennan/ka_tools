@@ -1,5 +1,7 @@
+from math import floor
+
 #   'Material':                (DR,Cost, Weight)
-MATERIALS = {
+BY_MATERIAL = {
     'NO':                       (0, 0,    0),
     'CANE':                     (1, 35,   12),
     'CLOTH_PADDED':             (1, 50,   6),
@@ -22,6 +24,8 @@ MATERIALS = {
     'PLATE_LIGHT_PP':           (5, 8000, 16)
 } 
 
+ALL_MATERIALS = list(BY_MATERIAL.keys())
+
 FLEXIBLE_MATERIALS = [
     'NO',
     'CLOTH_PADDED',
@@ -31,10 +35,8 @@ FLEXIBLE_MATERIALS = [
 ]
 
 # Location: (Cost multiplier, Hit probability)
-LOCATIONS = {
-    'HEAD':       (0.20, 4.0 / 216),
-    'NOSE':       (0.01, 6.0 / 216 / 6),
-    'CHEEKS':     (0.02, 6.0 / 216 / 3),
+BY_LOCATION = {
+    'HEAD':       (0.23, 10.0 / 216),
     # 'NECK':     (0.05, 4.0 / 216),
     'CHEST':      (0.75, 52.0 / 216),
     'ABDOMEN':    (0.25, 27.0 / 216),
@@ -51,40 +53,80 @@ LOCATIONS = {
     'FEET':       (0.10, 6.0 / 216),
 }
 
-options = []
+LOCATIONS = list(BY_LOCATION.keys())
 
-for dr in BY_DR.keys():
-    for location in BY_LOCATION.keys():
-        options.append((dr, location))
+CACHE = {}
 
-def efficiency(option):
-    by_location = BY_LOCATION[option[1]]
-    return BY_DR[option[0]] * by_location[0] / by_location[1]
+# `exclude` means exclude all locations whose index is < `exclude`
+def for_cost_and_weight(cost, weight, exclude=0):
+    if exclude >= len(LOCATIONS):
+        return (0, [])
 
-sorted_options = sorted(options, key=efficiency)
+    cost = floor(cost)
+    weight = floor(weight * 10) / 10.0
 
-def for_cost(max_cost):
-    total_cost = 0
-    result = {}
+    if not cost in CACHE:
+        CACHE[cost] = {}
+    if not weight in CACHE[cost]:
+        CACHE[cost][weight] = {}
+    if exclude in CACHE[cost][weight]:
+        return CACHE[cost][weight][exclude]
 
-    for option in sorted_options:
-        option_cost = BY_DR[option[0]] * BY_LOCATION[option[1]][0]
-        if total_cost + option_cost <= max_cost:
-            total_cost += option_cost
-            result[option[1]] = option[0]
+    location = LOCATIONS[exclude]
 
-    for key, val in result.items():
-        print(f'{key}: {val}')
+    if location in ['HANDS', 'THIGHS', 'FEET']:
+        material_options = FLEXIBLE_MATERIALS
+    else:
+        material_options = ALL_MATERIALS
 
-    print(f'TOTAL COST: ${total_cost}')
-    print('')
+    best = None
 
-for_cost(200)
-for_cost(300)
-for_cost(400)
-for_cost(500)
-for_cost(600)
-for_cost(700)
-for_cost(800)
-for_cost(900)
-for_cost(1000)
+    for material in material_options:
+        this_value = item_value(material, location)
+        this_cost = item_cost(material, location)
+        this_weight = item_weight(material, location)
+
+        if this_cost <= cost and this_weight <= weight:
+            recursive = for_cost_and_weight(
+                    cost - this_cost,
+                    weight - this_weight,
+                    exclude + 1,
+            )
+
+            new_value = this_value + recursive[0]
+            new_items = [material] + recursive[1]
+
+            if best is None or new_value > best[0]:
+                best = (new_value, new_items)
+
+    CACHE[cost][weight][exclude] = best
+
+    return best
+
+def item_value(material, location):
+    result = BY_MATERIAL[material][0] * BY_LOCATION[location][1]
+    if location == 'HEAD':
+        result *= 1.4
+    elif location in ['CHEST', 'ABDOMEN']:
+        result *= 6.5 / 6
+    return round(result * 10) / 10.0
+
+def item_cost(material, location):
+    result = BY_MATERIAL[material][1] * BY_LOCATION[location][0]
+    if location == 'HEAD':
+        result += 10 * 1.15
+    return round(result)
+
+def item_weight(material, location):
+    result = BY_MATERIAL[material][2] * BY_LOCATION[location][0]
+    if location == 'HEAD':
+        result += 1.2 * 1.15
+    return round(result)
+
+print(LOCATIONS)
+print(for_cost_and_weight(837, 68.8))
+print(for_cost_and_weight(640, 72.8))
+print(for_cost_and_weight(680, 88.8))
+print(for_cost_and_weight(417, 68.8))
+for i in range(21):
+    print(for_cost_and_weight(1000 + 500 * i, 83.8))
