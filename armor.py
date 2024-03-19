@@ -36,7 +36,7 @@ FLEXIBLE_MATERIALS = [
 
 # Location: (Cost multiplier, Hit probability)
 BY_LOCATION = {
-    'HEAD':       (0.23, 10.0 / 216),
+    'FEET':       (0.10, 6.0 / 216),
     # 'NECK':     (0.05, 4.0 / 216),
     'CHEST':      (0.75, 52.0 / 216),
     'ABDOMEN':    (0.25, 27.0 / 216),
@@ -51,7 +51,7 @@ BY_LOCATION = {
     'KNEES':      (0.05, 61.0 / 216 / 6),
     'SHINS':      (0.50, 61.0 / 216 / 2),
     # 'KNEES_SHINS': (0.55, 61.0 * 2 / 3),
-    'FEET':       (0.10, 6.0 / 216),
+    'HEAD':       (0.23, 10.0 / 216),
 }
 
 LOCATIONS = list(BY_LOCATION.keys())
@@ -106,7 +106,8 @@ def for_cost_and_weight(cost, weight, exclude=0):
 
 def item_value(material, location):
     result = BY_MATERIAL[material][0] * BY_LOCATION[location][1]
-    if location == 'HEAD':
+    if location == 'HEAD' and material != 'NO':
+        result += BY_LOCATION[location][1]
         result *= 1.4
     elif location in ['CHEST', 'ABDOMEN']:
         result *= 6.5 / 6
@@ -114,25 +115,21 @@ def item_value(material, location):
 
 def item_cost(material, location):
     if material == 'NO' and location == 'FEET':
-        return 25.0 # Sandals
-
-    result = BY_MATERIAL[material][1] * BY_LOCATION[location][0]
-    if location == 'HEAD':
+        result = 25.0 # Sandals
+    else:
+        result = BY_MATERIAL[material][1] * BY_LOCATION[location][0]
+    if location == 'HEAD' and material != 'NO':
         result += 10    
     return round(result)
 
 def item_weight(material, location):
     if material == 'NO' and location == 'FEET':
-        return 0.5 # Sandals
-
-    result = BY_MATERIAL[material][2] * BY_LOCATION[location][0]
-    if location == 'HEAD':
+        result = 0.5 # Sandals
+    else:
+        result = BY_MATERIAL[material][2] * BY_LOCATION[location][0]
+    if location == 'HEAD' and material != 'NO':
         result += 1.2
     return round(result * 10) / 10.0
 
 print(LOCATIONS)
-# print(for_cost_and_weight(837, 68.8))
 print(for_cost_and_weight(640, 72.8))
-# print(for_cost_and_weight(6000, 83.8))
-# print(for_cost_and_weight(9000, 83.8))
-# print(for_cost_and_weight(10000, 83.8))
